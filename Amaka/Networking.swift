@@ -17,12 +17,16 @@ struct NoteDTO: Decodable { let id: String; let content: String? }
 struct PiDTO: Decodable { let id: String; let tailscaleConnected: Bool; let cpuUsage: Double; let storageUsage: Double }
 
 final class APIClient {
-    let baseURL: URL
+    private var baseURL: URL
     let session: URLSession
 
     init(baseURL: URL, session: URLSession = .shared) {
         self.baseURL = baseURL
         self.session = session
+    }
+    
+    func updateBaseURL(_ url: URL) {
+        self.baseURL = url
     }
 
     func fetchDashboard() async throws -> DashboardResponse {
@@ -49,6 +53,10 @@ final class SyncService: ObservableObject {
     init(container: NSPersistentContainer, baseURL: URL) {
         self.container = container
         self.client = APIClient(baseURL: baseURL)
+    }
+    
+    func updateBaseURL(_ url: URL) {
+        client.updateBaseURL(url)
     }
 
     func start() {

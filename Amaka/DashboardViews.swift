@@ -2,32 +2,69 @@ import SwiftUI
 import CoreData
 import Combine
 
-// MARK: - Styling
-private let slateBackground = LinearGradient(
-    colors: [Color(red: 0.07, green: 0.08, blue: 0.10), Color(red: 0.03, green: 0.03, blue: 0.04)],
-    startPoint: .topLeading, endPoint: .bottomTrailing
-)
+// MARK: - Design System
+struct AppTheme {
+    static let background = LinearGradient(
+        colors: [Color(hex: "07080A"), Color(hex: "030304")],
+        startPoint: .topLeading, endPoint: .bottomTrailing
+    )
+    
+    static let accentBlue = Color(hex: "3B82F6")
+    static let accentPink = Color(hex: "EC4899")
+    static let accentGreen = Color(hex: "10B981")
+    static let accentOrange = Color(hex: "F59E0B")
+    
+    static let cardGradient = LinearGradient(
+        colors: [Color.white.opacity(0.06), Color.white.opacity(0.02)],
+        startPoint: .topLeading, endPoint: .bottomTrailing
+    )
+}
 
-struct BentoCard<Content: View>: View {
+extension Color {
+    init(hex: String) {
+        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: hex).scanHexInt64(&int)
+        let a, r, g, b: UInt64
+        switch hex.count {
+        case 3: // RGB (12-bit)
+            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
+        case 6: // RGB (24-bit)
+            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
+        case 8: // ARGB (32-bit)
+            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
+        default:
+            (a, r, g, b) = (1, 1, 1, 0)
+        }
+        self.init(.sRGB, red: Double(r) / 255, green: Double(g) / 255, blue: Double(b) / 255, opacity: Double(a) / 255)
+    }
+}
+
+// MARK: - Components
+struct PremiumBentoCard<Content: View>: View {
     let content: Content
     init(@ViewBuilder content: () -> Content) { self.content = content() }
+    
     var body: some View {
         content
-            .padding(14)
+            .padding(20)
             .background(
                 ZStack {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(Color.white.opacity(0.04))
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(.ultraThinMaterial)
-                        .blendMode(.overlay)
+                    RoundedRectangle(cornerRadius: 28, style: .continuous)
+                        .fill(AppTheme.cardGradient)
+                    
+                    RoundedRectangle(cornerRadius: 28, style: .continuous)
+                        .stroke(
+                            LinearGradient(
+                                colors: [.white.opacity(0.12), .clear, .white.opacity(0.05)],
+                                startPoint: .topLeading, endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1
+                        )
                 }
             )
-            .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(Color.white.opacity(0.10), lineWidth: 1)
-            )
-            .shadow(color: .black.opacity(0.45), radius: 18, x: 0, y: 12)
+            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: 10)
     }
 }
 
@@ -38,52 +75,66 @@ struct FamilyStatusBoard: View {
     @Environment(\.managedObjectContext) private var context
 
     var body: some View {
-        BentoCard {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 8) {
-                    Image(systemName: "person.3.fill").foregroundColor(.white)
-                    Text("Family").foregroundColor(.white).font(.headline)
+        PremiumBentoCard {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    Image(systemName: "person.2.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(AppTheme.accentBlue)
+                    Text("Family Status")
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
                     Spacer()
                 }
+                
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 18) {
+                    HStack(spacing: 20) {
                         ForEach(members, id: \.objectID) { member in
-                            VStack(spacing: 8) {
+                            VStack(spacing: 12) {
                                 ZStack {
-                                    Circle().fill(Color.white.opacity(0.10)).frame(width: 64, height: 64)
-                                    Image(systemName: "person.crop.circle.fill").resizable().foregroundColor(.white)
-                                        .frame(width: 56, height: 56)
+                                    Circle()
+                                        .fill(AppTheme.accentBlue.opacity(0.1))
+                                        .frame(width: 72, height: 72)
+                                    
+                                    if let urlString = member.avatarURL, let url = URL(string: urlString) {
+                                        AsyncImage(url: url) { image in
+                                            image.resizable().clipShape(Circle())
+                                        } placeholder: {
+                                            ProgressView()
+                                        }
+                                        .frame(width: 64, height: 64)
+                                    } else {
+                                        Text(String(member.name.prefix(1)))
+                                            .font(.system(size: 24, weight: .bold, design: .rounded))
+                                            .foregroundColor(.white)
+                                    }
+                                    
+                                    // Status Indicator
+                                    Circle()
+                                        .stroke(Color.black, lineWidth: 3)
+                                        .background(Circle().fill(AppTheme.accentGreen))
+                                        .frame(width: 14, height: 14)
+                                        .offset(x: 24, y: 24)
                                 }
-                                Text(member.name).font(.footnote).foregroundColor(.white.opacity(0.95))
-                                Text(member.status ?? "Unknown")
-                                    .font(.caption2)
-                                    .foregroundColor(.white)
-                                    .padding(.horizontal, 8).padding(.vertical, 4)
-                                    .background(Capsule().fill(Color.blue.opacity(0.28)))
+                                
+                                VStack(spacing: 4) {
+                                    Text(member.name)
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundColor(.white)
+                                    
+                                    Text(member.status ?? "Offline")
+                                        .font(.system(size: 10, weight: .medium))
+                                        .foregroundColor(.white.opacity(0.6))
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(Capsule().fill(Color.white.opacity(0.05)))
+                                }
                             }
                         }
                     }
                 }
-                if let me = members.first(where: { $0.isCurrentUser }) {
-                    Button(action: { toggleStatus(for: me) }) {
-                        Label("Toggle My Status", systemImage: "arrow.2.circlepath")
-                            .font(.footnote)
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 10).padding(.vertical, 6)
-                            .background(Capsule().fill(Color.blue.opacity(0.35)))
-                    }
-                    .buttonStyle(.plain)
-                }
             }
         }
-    }
-
-    private func toggleStatus(for member: FamilyMember) {
-        let options = ["At Home", "At Work", "Gym", "Away"]
-        let current = member.status ?? options.first!
-        let nextIndex = (options.firstIndex(of: current).map { (options.index(after: $0)) % options.count } ?? 0)
-        member.status = options[nextIndex]
-        try? context.save()
     }
 }
 
@@ -91,169 +142,251 @@ struct FamilyStatusBoard: View {
 struct CalendarWidget: View {
     @FetchRequest(
         sortDescriptors: [NSSortDescriptor(keyPath: \CalendarEvent.date, ascending: true)],
-        predicate: NSPredicate(format: "date >= %@", Date() as NSDate),
-        animation: .default
+        predicate: NSPredicate(format: "date >= %@", Date() as NSDate)
     ) private var events: FetchedResults<CalendarEvent>
 
-    @FetchRequest(sortDescriptors: [NSSortDescriptor(keyPath: \FamilyMember.name, ascending: true)])
-    private var members: FetchedResults<FamilyMember>
-
-    private func color(for personId: String?) -> Color {
-        guard let id = personId, let index = members.firstIndex(where: { $0.id == id }) else { return .teal }
-        let palette: [Color] = [.pink, .orange, .purple, .blue, .green, .mint, .yellow]
-        return palette[index % palette.count]
-    }
-
     var body: some View {
-        BentoCard {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack { Label("Upcoming", systemImage: "calendar").foregroundColor(.white.opacity(0.95)); Spacer() }
-                ForEach(events.prefix(3), id: \.objectID) { ev in
-                    HStack(spacing: 10) {
-                        Circle().fill(color(for: ev.personId).opacity(0.9)).frame(width: 8, height: 8)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(ev.title).foregroundColor(.white)
-                            Text(ev.date, style: .date).font(.caption2).foregroundColor(.white.opacity(0.7))
-                        }
-                        Spacer()
-                    }
-                }
-                if events.isEmpty { Text("No events").foregroundColor(.white.opacity(0.6)).font(.caption) }
-            }
-        }
-    }
-}
-
-// MARK: - Shopping List
-struct ShoppingListWidget: View {
-    @Environment(\.managedObjectContext) private var context
-    @FetchRequest(sortDescriptors: [NSSortDescriptor(keyPath: \ShoppingItem.title, ascending: true)])
-    private var items: FetchedResults<ShoppingItem>
-    @State private var newItem: String = ""
-
-    var body: some View {
-        BentoCard {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack { Label("Shopping", systemImage: "cart").foregroundColor(.white.opacity(0.95)); Spacer() }
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 8) {
-                        ForEach(items, id: \.objectID) { item in
-                            Button(action: { toggle(item) }) {
-                                HStack(spacing: 10) {
-                                    Image(systemName: item.completed ? "checkmark.circle.fill" : "circle")
-                                        .foregroundColor(item.completed ? .green : .white.opacity(0.7))
-                                    Text(item.title)
-                                        .strikethrough(item.completed, color: .white.opacity(0.7))
-                                        .foregroundColor(.white)
-                                        .animation(.easeInOut(duration: 0.2), value: item.completed)
-                                    Spacer()
-                                }
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
-                HStack(spacing: 8) {
-                    TextField("Quick Add", text: $newItem)
-                        .textFieldStyle(.roundedBorder)
-                    Button(action: add) { Image(systemName: "plus.circle.fill").font(.title3) }
-                        .tint(.blue)
-                }
-            }
-        }
-    }
-
-    private func toggle(_ item: ShoppingItem) {
-        item.completed.toggle()
-        try? context.save()
-    }
-
-    private func add() {
-        let trimmed = newItem.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        let obj = ShoppingItem(context: context)
-        obj.id = UUID().uuidString
-        obj.title = trimmed
-        obj.completed = false
-        try? context.save()
-        newItem = ""
-    }
-}
-
-// MARK: - Secure Notes
-struct SecureNotesWidget: View {
-    @FetchRequest(sortDescriptors: []) private var notes: FetchedResults<SecureNote>
-    var body: some View {
-        BentoCard {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 6) {
-                    Image(systemName: "lock.fill").foregroundColor(.green)
-                    Text("End-to-End Encrypted").foregroundColor(.white.opacity(0.85)).font(.subheadline)
+        PremiumBentoCard {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack {
+                    Image(systemName: "calendar")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(AppTheme.accentPink)
+                    Text("Events")
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
                     Spacer()
                 }
-                Text(notes.first?.content ?? "No shared note yet.")
-                    .foregroundColor(.white)
-                    .lineLimit(5)
+                
+                VStack(alignment: .leading, spacing: 12) {
+                    ForEach(events.prefix(3), id: \.objectID) { ev in
+                        HStack(spacing: 12) {
+                            VStack {
+                                Text(ev.date, format: .dateTime.day())
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundColor(.white)
+                                Text(ev.date, format: .dateTime.month(.abbreviated))
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundColor(AppTheme.accentPink)
+                            }
+                            .frame(width: 36, height: 40)
+                            .background(Color.white.opacity(0.05))
+                            .cornerRadius(10)
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(ev.title)
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundColor(.white)
+                                Text(ev.date, style: .time)
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.white.opacity(0.5))
+                            }
+                        }
+                    }
+                    
+                    if events.isEmpty {
+                        Text("No upcoming events")
+                            .font(.system(size: 12))
+                            .foregroundColor(.white.opacity(0.4))
+                            .padding(.top, 4)
+                    }
+                }
             }
         }
     }
 }
 
-// MARK: - Pi Status
+// MARK: - Shopping Widget
+struct ShoppingListWidget: View {
+    @FetchRequest(sortDescriptors: [NSSortDescriptor(keyPath: \ShoppingItem.title, ascending: true)])
+    private var items: FetchedResults<ShoppingItem>
+    @Environment(\.managedObjectContext) private var context
+
+    var body: some View {
+        PremiumBentoCard {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    Image(systemName: "cart.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(AppTheme.accentOrange)
+                    Text("Shopping")
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                    Spacer()
+                    Text("\(items.filter { !$0.completed }.count) items")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.white.opacity(0.5))
+                }
+                
+                VStack(spacing: 8) {
+                    ForEach(items.prefix(4), id: \.objectID) { item in
+                        HStack(spacing: 12) {
+                            Image(systemName: item.completed ? "checkmark.circle.fill" : "circle")
+                                .foregroundColor(item.completed ? AppTheme.accentGreen : .white.opacity(0.2))
+                                .font(.system(size: 18))
+                            
+                            Text(item.title)
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(item.completed ? .white.opacity(0.3) : .white)
+                                .strikethrough(item.completed)
+                            
+                            Spacer()
+                        }
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 12)
+                        .background(Color.white.opacity(item.completed ? 0.02 : 0.04))
+                        .cornerRadius(12)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Server Status Widget
 struct PiStatusWidget: View {
     @FetchRequest(sortDescriptors: []) private var statuses: FetchedResults<PiStatus>
 
     var body: some View {
         let status = statuses.first
-        return BentoCard {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 8) {
-                    Circle().fill((status?.tailscaleConnected ?? false) ? Color.green : Color.red).frame(width: 10, height: 10)
-                    Text("Tailscale Connected").foregroundColor(.white.opacity(0.95))
+        PremiumBentoCard {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    Image(systemName: "cpu")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(AppTheme.accentGreen)
+                    Text("Server")
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                    Spacer()
+                    Circle()
+                        .fill((status?.tailscaleConnected ?? false) ? AppTheme.accentGreen : .red)
+                        .frame(width: 8, height: 8)
+                        .shadow(color: (status?.tailscaleConnected ?? false) ? AppTheme.accentGreen.opacity(0.5) : .red.opacity(0.5), radius: 4)
+                }
+                
+                VStack(spacing: 12) {
+                    MetricRow(label: "CPU", value: status?.cpuUsage ?? 0, color: AppTheme.accentGreen)
+                    MetricRow(label: "Disk", value: status?.storageUsage ?? 0, color: AppTheme.accentBlue)
+                }
+            }
+        }
+    }
+}
+
+struct MetricRow: View {
+    let label: String
+    let value: Double
+    let color: Color
+    
+    var body: some View {
+        VStack(spacing: 6) {
+            HStack {
+                Text(label).font(.system(size: 11, weight: .medium)).foregroundColor(.white.opacity(0.5))
+                Spacer()
+                Text("\(Int(value * 100))%").font(.system(size: 11, weight: .bold)).foregroundColor(.white)
+            }
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color.white.opacity(0.05))
+                    Capsule()
+                        .fill(color)
+                        .frame(width: geo.size.width * CGFloat(value))
+                }
+            }
+            .frame(height: 6)
+        }
+    }
+}
+
+// MARK: - Shared Note Widget
+struct SecureNotesWidget: View {
+    @FetchRequest(sortDescriptors: []) private var notes: FetchedResults<SecureNote>
+    
+    var body: some View {
+        PremiumBentoCard {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Image(systemName: "lock.shield.fill")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(AppTheme.accentBlue)
+                    Text("Shared Note")
+                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
                     Spacer()
                 }
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("CPU").font(.caption2).foregroundColor(.white.opacity(0.7))
-                    ProgressView(value: status?.cpuUsage ?? 0.0).tint(.green)
-                    Text("Storage").font(.caption2).foregroundColor(.white.opacity(0.7))
-                    ProgressView(value: status?.storageUsage ?? 0.0).tint(.blue)
-                }
+                
+                Text(notes.first?.content ?? "No shared notes available yet. Tap to add.")
+                    .font(.system(size: 13))
+                    .lineSpacing(4)
+                    .foregroundColor(.white.opacity(0.8))
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
     }
 }
 
-// MARK: - Dashboard Grid
+// MARK: - Dashboard View
 struct DashboardView: View {
     @EnvironmentObject var sync: SyncService
-
-    private let columns = [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)]
-
+    
     var body: some View {
         ScrollView {
-            VStack(spacing: 16) {
-                // Full-width Family status
+            VStack(spacing: 20) {
+                // Header
+                HStack(alignment: .bottom) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Good Evening,")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.white.opacity(0.5))
+                        Text("Noah")
+                            .font(.system(size: 28, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                    }
+                    Spacer()
+                    ZStack {
+                        Circle()
+                            .fill(Color.white.opacity(0.05))
+                            .frame(width: 44, height: 44)
+                        Image(systemName: "bell.badge.fill")
+                            .foregroundColor(.white)
+                            .font(.system(size: 18))
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 20)
+                
+                // Status Board
                 FamilyStatusBoard()
-                // Grid for square widgets
-                LazyVGrid(columns: columns, alignment: .leading, spacing: 16) {
-                    CalendarWidget()
-                    SecureNotesWidget()
-                    PiStatusWidget()
+                    .padding(.horizontal, 20)
+                
+                // Two Column Grid
+                HStack(alignment: .top, spacing: 16) {
+                    VStack(spacing: 16) {
+                        CalendarWidget()
+                        PiStatusWidget()
+                    }
+                    VStack(spacing: 16) {
+                        SecureNotesWidget()
+                        ShoppingListWidget()
+                    }
                 }
-                // Full-width tall card
-                ShoppingListWidget()
-            }
-            .padding(16)
-        }
-        .background(slateBackground.ignoresSafeArea())
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Family Hub").font(.title2).bold().foregroundColor(.white)
-                    Text(sync.lastSync != nil ? "Updated just now" : "Connecting...")
-                        .font(.caption2).foregroundColor(.white.opacity(0.6))
+                .padding(.horizontal, 20)
+                
+                // Footer / Sync Info
+                HStack {
+                    Circle()
+                        .fill(sync.lastError == nil ? AppTheme.accentGreen : Color.red)
+                        .frame(width: 6, height: 6)
+                    Text(sync.lastSync != nil ? "Last synced at \(sync.lastSync!, format: .dateTime.hour().minute().second())" : "Syncing...")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.white.opacity(0.4))
                 }
+                .padding(.vertical, 20)
             }
         }
+        .background(AppTheme.background.ignoresSafeArea())
+        .navigationBarHidden(true)
     }
 }
+
