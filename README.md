@@ -43,8 +43,55 @@ Amaka is designed to connect automatically to your home server using Tailscale's
 - **Shopping List**: Collaborative list for family groceries.
 - **Secure Notes**: End-to-end encrypted shared notes.
 
+## Raspberry Pi Server Setup
+
+The `server/` directory contains a Python server designed to run on your Raspberry Pi.
+
+### Prerequisites
+
+- Python 3.9+
+- `pip install flask psutil`
+
+### Running the Server
+
+1. **Transfer the code**: Copy the `server/` folder to your Raspberry Pi.
+2. **Start the server**:
+   ```bash
+   python3 main.py
+   ```
+   The server will run on port 8080.
+
+3. **Autostart on boot (optional)**:
+   You can use `systemd` to keep the server running:
+   ```bash
+   sudo nano /etc/systemd/system/amaka-server.service
+   ```
+   Add the following:
+   ```ini
+   [Unit]
+   Description=Amaka Family Hub Server
+   After=network.target
+
+   [Service]
+   ExecStart=/usr/bin/python3 /path/to/server/main.py
+   WorkingDirectory=/path/to/server
+   StandardOutput=inherit
+   StandardError=inherit
+   Restart=always
+   User=pi
+
+   [Install]
+   WantedBy=multi-user.target
+   ```
+   Then enable and start it:
+   ```bash
+   sudo systemctl enable amaka-server
+   sudo systemctl start amaka-server
+   ```
+
 ## Requirements
 
 - iOS 16.0+
 - Xcode 14.0+
+- Python 3.9+ (on server)
 - A Tailscale account and a configured node.
