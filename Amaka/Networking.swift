@@ -18,11 +18,15 @@ struct PiDTO: Decodable { let id: String; let tailscaleConnected: Bool; let cpuU
 
 final class APIClient {
     let baseURL: URL
-    let session: URLSession
+    var session: URLSession
 
     init(baseURL: URL, session: URLSession = .shared) {
         self.baseURL = baseURL
         self.session = session
+    }
+
+    func updateSession(with newSession: URLSession) {
+        self.session = newSession
     }
 
     func fetchDashboard() async throws -> DashboardResponse {
@@ -45,10 +49,21 @@ final class SyncService: ObservableObject {
     private var isRunning = false
     private let client: APIClient
     private let container: NSPersistentContainer
+    private var cancellables = Set<AnyCancellable>()
 
     init(container: NSPersistentContainer, baseURL: URL) {
         self.container = container
         self.client = APIClient(baseURL: baseURL)
+
+        // Listen for Tailscale connection changes
+        TailscaleManager.shared.$isConnected
+            .sink { [weak self] connected in
+                if connected {
+                    let tsSession = TailscaleManager.shared.makeSession()
+                    self?.client.updateSession(with: tsSession)
+                }
+            }
+            .store(in: &cancellables)
     }
 
     func start() {

@@ -16,18 +16,56 @@ struct BentoCard<Content: View>: View {
             .padding(14)
             .background(
                 ZStack {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
                         .fill(Color.white.opacity(0.04))
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
                         .fill(.ultraThinMaterial)
                         .blendMode(.overlay)
                 }
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(Color.white.opacity(0.10), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(Color.white.opacity(0.15), lineWidth: 0.5)
             )
-            .shadow(color: .black.opacity(0.45), radius: 18, x: 0, y: 12)
+            .shadow(color: .black.opacity(0.45), radius: 20, x: 0, y: 12)
+    }
+}
+
+// MARK: - Weather Widget
+struct WeatherWidget: View {
+    @StateObject private var weatherManager = WeatherManager()
+
+    var body: some View {
+        BentoCard {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Image(systemName: "cloud.sun.fill")
+                        .symbolRenderingMode(.multicolor)
+                        .font(.title2)
+                    Spacer()
+                    Text("\(weatherManager.temperature)°")
+                        .font(.system(size: 28, weight: .bold))
+                        .foregroundColor(.white)
+                }
+
+                Text(weatherManager.condition)
+                    .font(.footnote)
+                    .foregroundColor(.white.opacity(0.8))
+
+                HStack {
+                    Text("H:\(weatherManager.high)°")
+                    Text("L:\(weatherManager.low)°")
+                }
+                .font(.caption2)
+                .foregroundColor(.white.opacity(0.6))
+
+                Text(weatherManager.location)
+                    .font(.caption2)
+                    .fontWeight(.medium)
+                    .foregroundColor(.blue)
+                    .padding(.top, 2)
+            }
+        }
     }
 }
 
@@ -223,6 +261,47 @@ struct PiStatusWidget: View {
     }
 }
 
+// MARK: - Greeting Header
+struct GreetingHeader: View {
+    @EnvironmentObject var sync: SyncService
+
+    var greeting: String {
+        let hour = Calendar.current.component(.hour, from: Date())
+        if hour < 12 { return "Good Morning" }
+        if hour < 17 { return "Good Afternoon" }
+        return "Good Evening"
+    }
+
+    var dateString: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE, MMMM d"
+        return formatter.string(from: Date())
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(greeting)
+                .font(.system(size: 28, weight: .bold, design: .rounded))
+                .foregroundColor(.white)
+
+            HStack {
+                Text(dateString)
+                    .font(.subheadline)
+                    .foregroundColor(.white.opacity(0.6))
+
+                Circle()
+                    .fill(sync.lastSync != nil ? Color.green : Color.orange)
+                    .frame(width: 6, height: 6)
+
+                Text(sync.lastSync != nil ? "Synced" : "Connecting...")
+                    .font(.caption2)
+                    .foregroundColor(.white.opacity(0.4))
+            }
+        }
+        .padding(.horizontal, 4)
+    }
+}
+
 // MARK: - Dashboard Grid
 struct DashboardView: View {
     @EnvironmentObject var sync: SyncService
@@ -231,29 +310,30 @@ struct DashboardView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 16) {
+            VStack(alignment: .leading, spacing: 20) {
+                GreetingHeader()
+                    .padding(.top, 10)
+
+                // Weather and Pi status in a row
+                HStack(spacing: 16) {
+                    WeatherWidget()
+                    PiStatusWidget()
+                }
+
                 // Full-width Family status
                 FamilyStatusBoard()
-                // Grid for square widgets
+
+                // Grid for other widgets
                 LazyVGrid(columns: columns, alignment: .leading, spacing: 16) {
                     CalendarWidget()
                     SecureNotesWidget()
-                    PiStatusWidget()
                 }
+
                 // Full-width tall card
                 ShoppingListWidget()
             }
             .padding(16)
         }
         .background(slateBackground.ignoresSafeArea())
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Family Hub").font(.title2).bold().foregroundColor(.white)
-                    Text(sync.lastSync != nil ? "Updated just now" : "Connecting...")
-                        .font(.caption2).foregroundColor(.white.opacity(0.6))
-                }
-            }
-        }
     }
 }
