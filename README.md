@@ -7,7 +7,7 @@ Amaka is a self-hosted family dashboard system consisting of an iOS application 
 ### Server Requirements
 - Go 1.21 or later installed on the host machine (Raspberry Pi, old computer, etc.).
   Check with:
-  ``` go version ```
+``` go version ```
 - A Tailscale account.
 - Internet access for initial setup and authentication.
 
